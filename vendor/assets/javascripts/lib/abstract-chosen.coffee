@@ -14,6 +14,9 @@ class AbstractChosen
   set_default_values: ->
     @click_test_action = (evt) => this.test_active_click(evt)
     @activate_action = (evt) => this.activate_field(evt)
+    # MODIFIED - Added clean_search_text method so that the caller can clean up the search text
+    @clean_search_text = @options.clean_search_text || (option) -> option.html
+    @calling_context = @options.calling_context;
     @active_field = false
     @mouse_on_container = false
     @results_showing = false
@@ -57,18 +60,20 @@ class AbstractChosen
   results_option_build: (options) ->
     content = ''
     for data in @results_data
-      if data.group
-        content += this.result_add_group data
-      else
-        content += this.result_add_option data
+      # MODIFIED. Don't include the place holder text in the drop down or in searches.
+      if data.text != @options.placeholder_text_single && data.text != @options.placeholder_text_multiple
+        if data.group
+          content += this.result_add_group data
+        else
+          content += this.result_add_option data
 
-      # this select logic pins on an awkward flag
-      # we can make it better
-      if options?.first
-        if data.selected and @is_multiple
-          this.choice_build data
-        else if data.selected and not @is_multiple
-          this.single_set_selected_text(data.text)
+        # this select logic pins on an awkward flag
+        # we can make it better
+        if options?.first
+          if data.selected and @is_multiple
+            this.choice_build data
+          else if data.selected and not @is_multiple
+            this.single_set_selected_text(data.text)
 
     content
 
@@ -150,10 +155,10 @@ class AbstractChosen
           results_group = @results_data[option.group_array_index]
           results += 1 if results_group.active_options is 0 and results_group.search_match
           results_group.active_options += 1
-                
-        unless option.group and not @group_search
 
-          option.search_text = if option.group then option.label else option.html
+        unless option.group and not @group_search
+          # MODIFIED added clean_search_text
+          option.search_text = if option.group then option.label else @clean_search_text(option, @calling_context);
           option.search_match = this.search_string_match(option.search_text, regex)
           results += 1 if option.search_match and not option.group
 
@@ -164,7 +169,7 @@ class AbstractChosen
               option.search_text = text.substr(0, startpos) + '<em>' + text.substr(startpos)
 
             results_group.group_match = true if results_group?
-          
+
           else if option.group_array_index? and @results_data[option.group_array_index].search_match
             option.search_match = true
 
@@ -194,7 +199,7 @@ class AbstractChosen
     @selected_option_count = 0
     for option in @form_field.options
       @selected_option_count += 1 if option.selected
-    
+
     return @selected_option_count
 
   choices_click: (evt) ->
@@ -252,7 +257,7 @@ class AbstractChosen
     tmp.appendChild(element)
     tmp.innerHTML
 
-  # class methods and variables ============================================================ 
+  # class methods and variables ============================================================
 
   @browser_is_supported: ->
     if window.navigator.appName == "Microsoft Internet Explorer"
